@@ -1,38 +1,92 @@
+//Crearing a simple server
+
 import http from 'http'
+import fs from 'fs/promises'
+import {parse} from 'querystring' //use it to convert the data into understandable format
+import { v4 as uuidv4 } from 'uuid'
 
 const PORT = '8080'
 
-let products = [
-  {
-    "id": 1,
-    "name": "Laptop",
-    "image": "https://m.media-amazon.com/images/I/81KoSSAwH2L._SL1500_.jpg",
-    "description": "High-performance laptop for all your needs.",
-    "categories": [1, 2],
-    "variants": ["8GB RAM", "16GB RAM"],
-    "sizes": ["13-inch", "15-inch"]
-  },
-  {
-    "id": 2,
-    "name": "Smartphone",
-    "image": "https://m.media-amazon.com/images/I/81SigpJN1KL._SL1500_.jpg",
-    "description": "Latest smartphone with advanced features.",
-    "categories": [1, 3],
-    "variants": ["64GB", "128GB"],
-    "sizes": []
-  }
-]
+const products = JSON.parse(await fs.readFile('products.json', 'utf-8'))
 
-const server = http.createServer((req, res) => {
+const successResponse = (res, statusCode = 200, message = 'successful', payload = {}) => { //payload refers to the data we send (the name can be anything)
+  res.writeHead(statusCode, {'Content-Type': 'application/json'}) 
+  res.write(JSON.stringify({
+    message, message,
+    payload: payload
+  }))
+  res.end()
+}
+
+const errorResponse = (res, statusCode = 500, message = 'Server Error') => {
+  res.writeHead(statusCode, {'Content-Type': 'application/json'}) 
+  res.write(JSON.stringify({message, message}))
+  res.end()
+}
+
+const server = http.createServer(async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*')
+
   if(req.url === '/' && req.method === 'GET'){
-    res.writeHead(200, {'Content-Type': 'text/html'}) //to specify the data that will be returned (plain, html, or json)
-    res.write('<h1> Hello, World! </h1>')
-    res.end()
+    try {
+      successResponse(res, 200, 'Hello World!')
+    } catch (error) {
+      errorResponse(res, 500, error.message)
+    }
+  }
+  else if(req.url === '/' && req.method === 'POST'){
+    try {
+      let body = ''
+
+      req.on('data', (chunk) => {
+        body = body + chunk
+      }) //chunk is the seprated data (name, price...) the name can be anything
+      
+      req.on('end', () => {
+        const data = parse(body)
+        console.log(data)
+        successResponse(res, 201, 'New data is received')
+      })
+
+    } catch (error) {
+      errorResponse(res, 500, error.message)
+    } 
   }
   else if(req.url === '/products' && req.method === 'GET'){
-    res.writeHead(200, {'Content-Type': 'application/json'}) 
-    res.write(JSON.stringify(products))
-    res.end()
+    try {
+      // const products = JSON.parse(await fs.readFile('products.json', 'utf-8'))
+      successResponse(res, 200, 'Render all products', products)
+    } catch (error) {
+      errorResponse(res, 500, error.message)
+    } 
+  }
+  else if(req.url === '/products' && req.method === 'POST'){
+    try {
+      let body = ''
+
+      req.on('data', (chunk) => {
+        body = body + chunk
+      }) 
+      
+      req.on('end', async () => {
+        const data = parse(body)
+        const newProduct = {
+          id: uuidv4(),
+          name: String(data.name),
+          price: Number(data.price)
+        }
+        // const existingProducts = JSON.parse(await fs.readFile('products.json', 'utf-8'))
+        products.push(newProduct)
+        await fs.writeFile('products.json', JSON.stringify(products))
+        successResponse(res, 201, 'New product is created')
+      })
+
+    } catch (error) {
+      errorResponse(res, 500, error.message)
+    } 
+  }
+  else {
+    errorResponse(res, 500, 'Route is not found')
   }
 })
 
