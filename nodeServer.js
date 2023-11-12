@@ -1,9 +1,8 @@
-//Crearing a simple server
+//Crearing a simple server using node.js
 
 import http from 'http'
 import fs from 'fs/promises'
 import {parse} from 'querystring' //use it to convert the data into understandable format
-import { v4 as uuidv4 } from 'uuid'
 
 const PORT = '8080'
 
@@ -54,7 +53,6 @@ const server = http.createServer(async (req, res) => {
   }
   else if(req.url === '/products' && req.method === 'GET'){
     try {
-      // const products = JSON.parse(await fs.readFile('products.json', 'utf-8'))
       successResponse(res, 200, 'Render all products', products)
     } catch (error) {
       errorResponse(res, 500, error.message)
@@ -71,11 +69,10 @@ const server = http.createServer(async (req, res) => {
       req.on('end', async () => {
         const data = parse(body)
         const newProduct = {
-          id: uuidv4(),
+          id: new Date().getTime().toString(),
           name: String(data.name),
           price: Number(data.price)
         }
-        // const existingProducts = JSON.parse(await fs.readFile('products.json', 'utf-8'))
         products.push(newProduct)
         await fs.writeFile('products.json', JSON.stringify(products))
         successResponse(res, 201, 'New product is created')
